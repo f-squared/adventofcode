@@ -38,7 +38,7 @@ EMPTY_JUPYTER_NOTEBOOK = """{
 
 def main():
     """Set up files I use for a day of Advent of Code."""
-    parser = argparse.ArgumentParser("Bootstrap files for a year of Advent of Code problems.")
+    parser = argparse.ArgumentParser("Bootstrap files for a day of Advent of Code.")
     parser.add_argument("year", type=str)
     parser.add_argument("day", type=int)
     args = parser.parse_args()
