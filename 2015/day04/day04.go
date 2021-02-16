@@ -19,7 +19,7 @@ func calcMD5(suffix int) string {
 }
 
 // Takes about 3-4 seconds on my computer.
-func naiveSolution() {
+func nonConcurrentSolution() {
 	i := 0
 	part1Found := false
 	for {
@@ -38,19 +38,18 @@ func naiveSolution() {
 
 type Answer struct {
 	part         int
-	goroutineNum int
 	suffix       int
 }
 
-const numRoutines = 15
+const numRoutines = 12
 
 type AdventCoinMiner struct {
 	answerChan  chan Answer
 	mx          sync.RWMutex
 	answer1     int
 	answer2     int
-	candidates1 [numRoutines]int
-	candidates2 [numRoutines]int
+	numResponses1 int
+	numResponses2 int
 }
 
 // Search for parts 1 and 2 answer matches.
@@ -64,51 +63,41 @@ func (m *AdventCoinMiner) crunch(num int) {
 		// then this goroutine's work is done for that part.
 		if m.answer1 != 0 && m.answer1 < suffix && !foundPart1 {
 			m.mx.RUnlock()
-			m.answerChan <- Answer{1, num, suffix} // this will be ignored in calculation of final answer
+			m.answerChan <- Answer{1, suffix} // this will be ignored in calculation of final answer
 			m.mx.RLock()
 			foundPart1 = true
 		}
 		if m.answer2 != 0 && m.answer2 < suffix {
 			m.mx.RUnlock()
-			m.answerChan <- Answer{2, num, suffix} // this will be ignored in calculation of final answer
+			m.answerChan <- Answer{2, suffix} // this will be ignored in calculation of final answer
 			return
 		}
 		m.mx.RUnlock()
 
 		h := calcMD5(suffix)
 		if h[:5] == "00000" && !foundPart1 {
-			m.answerChan <- Answer{1, num, suffix}
+			m.answerChan <- Answer{1, suffix}
 			foundPart1 = true // don't send more part 1 answers to channel
 		}
 		if h[:6] == "000000" {
-			m.answerChan <- Answer{2, num, suffix}
+			m.answerChan <- Answer{2, suffix}
 			return
 		}
 		suffix += numRoutines
 	}
 }
 
-func minButNotZero(candidates [numRoutines]int) int {
-	minAnswer := 0
-	for _, v := range candidates {
-		if minAnswer == 0 || (v != 0 && v < minAnswer) {
-			minAnswer = v
-		}
+func minButNotZero(x, y int) int {
+	if x == 0 {
+		return y
 	}
-	if minAnswer == 0 {
-		panic("Unexpected zero candidate!")
+	if y == 0 {
+		return x
 	}
-	return minAnswer
-}
-
-func numZeroes(candidates [numRoutines]int) int {
-	count := 0
-	for _, v := range candidates {
-		if v == 0 {
-			count++
-		}
+	if x < y {
+		return x
 	}
-	return count
+	return y
 }
 
 // Well that was gnarly. 
@@ -127,20 +116,20 @@ func concurrentSolution() {
 		select {
 		case answer := <-m.answerChan:
 			if answer.part == 1 {
-				m.candidates1[answer.goroutineNum] = answer.suffix
 				m.mx.Lock()
-				m.answer1 = minButNotZero(m.candidates1)
+				m.answer1 = minButNotZero(m.answer1, answer.suffix)
 				m.mx.Unlock()
+				m.numResponses1++
 			}
 			if answer.part == 2 {
-				m.candidates2[answer.goroutineNum] = answer.suffix
 				m.mx.Lock()
-				m.answer2 = minButNotZero(m.candidates2)
+				m.answer2 = minButNotZero(m.answer2, answer.suffix)
 				m.mx.Unlock()
+				m.numResponses2++
 			}
 		}
 
-		if numZeroes(m.candidates1) == 0 && numZeroes(m.candidates2) == 0 {
+		if m.numResponses1 == numRoutines && m.numResponses2 == numRoutines {
 			fmt.Println("Part 1 answer:", m.answer1)
 			fmt.Println("Part 2 answer:", m.answer2)
 			return
@@ -150,7 +139,7 @@ func concurrentSolution() {
 
 func main() {
 	start := time.Now()
-	naiveSolution()
+	nonConcurrentSolution()
 	elapsed := time.Now().Sub(start)
 	fmt.Printf("Non-concurrent solution took %v!\n\n", elapsed)
 
