@@ -59,7 +59,7 @@ def main():
         return
 
     # Create empty file to paste in example input
-    with open(os.path.join(day_dir, f"day-{args.day}-input-example.txt"), "w"):
+    with open(os.path.join(day_dir, f"input-example.txt"), "w"):
         pass
 
     # Create empty Jupyter notebook
